@@ -15,6 +15,11 @@ class Report(Base):
     id=Column(Integer,primary_key=True);name=Column(String(120),nullable=False);relation_id=Column(Integer,ForeignKey('relations.id'),nullable=False)
     status=Column(String(20),nullable=False,default='queued');input_snapshot=Column(JSON,nullable=False);result=Column(JSON,nullable=True);error=Column(Text,nullable=True)
     created_at=Column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+class Retirement(Base):
+    __tablename__='retirements'
+    id=Column(Integer,primary_key=True);relation_id=Column(Integer,ForeignKey('relations.id'),nullable=False);field=Column(String(40),nullable=False)
+    status=Column(String(20),nullable=False,default='pending');baseline=Column(String(64),nullable=True);impact=Column(JSON,nullable=True)
+    created_at=Column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
 class Audit(Base):
     __tablename__='audit_logs'
     id=Column(Integer,primary_key=True);actor=Column(String(120),nullable=False);action=Column(String(160),nullable=False);created_at=Column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))

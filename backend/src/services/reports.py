@@ -13,7 +13,7 @@ def detail(db,ident):
     if not obj:raise HTTPException(404,'报告不存在')
     return record(obj)
 def create(db,data,user):
-    relation=db.get(Relation,data.relation_id)
+    relation=db.scalar(select(Relation).where(Relation.id==data.relation_id).with_for_update())
     if not relation:raise HTTPException(404,'关系不存在')
     deps=list(db.scalars(select(Dependency).where(Dependency.relation_id==relation.id)))
     snapshot={'relation':record(relation),'dependencies':[{'lhs':x.lhs,'rhs':x.rhs} for x in deps]}

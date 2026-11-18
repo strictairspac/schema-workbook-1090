@@ -30,6 +30,16 @@ docker compose exec -T backend python -m scripts.seed_demo
 
 另有 `NL-1117-B` 的循环依赖 A→B/B→A与独立属性C，候选键AC/BC；`NL-1117-C` 没有确认依赖，完整属性集作为唯一候选键，不凭空猜测业务规则。
 
+## 字段下线预检
+
+委托关系草案下线字段不能一删了之：直接退出会让函数依赖和分解报告失真。草案页提供「发起字段下线」，流程为预检 → 确认 → 生效。
+
+1. 预检：沿依赖传递做污染分析——从退役字段出发，决定项被波及的规则其被决定项也受影响——列出将删除的规则（引用该字段）、波及规则、在途报告（queued/running）、剩余属性与候选键对比，并冻结基线指纹（属性+依赖的SHA256）。预检不改动任何数据。
+2. 确认：重新校验基线，预检期间并发编辑属性或依赖使基线变化即拒绝并置为冲突，重新预检后可再确认；存在在途报告或下线后原候选键全部失效（至少一个不含该字段的原候选键仍是剩余属性集的超键方可）同样拒绝，草案保持不变。
+3. 生效：单事务删除字段与引用它的依赖，失败自动回滚草案并标记失败；所有接口幂等，重试不会重复建单或重复下线。已完成报告保留原快照，新报告快照不再包含退役字段（报告入队与下线确认在同一关系行锁上串行）。
+
+页面列出每件下线单的状态（待预检/冲突/已生效/失败）与影响范围。接口：`POST /relations/{id}/retirements` 发起/幂等刷新、`POST /retirements/{id}/precheck` 重新预检、`POST /retirements/{id}/confirm` 确认生效、`GET /retirements` 列表。
+
 ## 算法说明
 
 Python真算，MySQL保存草案/依赖与结果，Redis传递任务，独立worker执行。
@@ -56,7 +66,7 @@ Python真算，MySQL保存草案/依赖与结果，Redis传递任务，独立wor
 
 目录：`frontend/src/{api,stores,types,components/common,hooks,pages,router,utils,constants}`；`backend/src/{routes,controllers,services,models,schemas,middlewares,utils,constants,config}`；`backend/scripts/seed_demo.py`；`backend/migrations/001_initial.sql`。每核心实体贯穿模型/schema/service/route/API/store/page。组件table/badge/frame复用，hooks/session/feedback和utils/forms/html共用；request_id/errors双后端中间件。
 
-枚举：角色admin/operator/viewer、任务queued/running/completed/failed；前后端定义位于 `backend/src/constants/enums.py` 和 `frontend/src/constants/enums.js`，security/reports、frame/badge消费；worker持久化状态。
+枚举：角色admin/operator/viewer、任务queued/running/completed/failed、下线pending/conflict/effective/failed；前后端定义位于 `backend/src/constants/enums.py` 和 `frontend/src/constants/enums.js`，security/reports、frame/badge消费；worker持久化状态。
 
 环境变量见.env.example：COMPOSE_PROJECT_NAME、FRONTEND_PORT/BACKEND_PORT/DB_PORT、DB_PASSWORD、JWT_SECRET、SEED_DEMO。默认密码仅本地演示，JWT8小时。seed按自然键只补缺失关系及初始依赖，不覆盖用户修改。schema由SQLAlchemy metadata.create_all初始化，无在线迁移引擎。
 
